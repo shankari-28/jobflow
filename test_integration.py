@@ -96,7 +96,7 @@ async def test_lifecycle():
     worker_id = f"worker-test-{uuid.uuid4().hex[:4]}"
     log_file = open("worker_test.log", "w", encoding="utf-8")
     worker_proc = subprocess.Popen(
-        [sys.executable, "worker.py", "--id", worker_id, "--concurrency", "2", "--poll", "0.5"],
+        [sys.executable, "worker.py", "--id", worker_id, "--project", project.id, "--concurrency", "2", "--poll", "0.5"],
         stdout=log_file,
         stderr=log_file,
         text=True
