@@ -285,8 +285,21 @@ class Worker:
             logger.info(f"[{self.name}] Shutdown signal received — draining...")
             self.shutdown_event.set()
 
-        loop.add_signal_handler(signal.SIGTERM, _shutdown)
-        loop.add_signal_handler(signal.SIGINT, _shutdown)
+        try:
+            loop.add_signal_handler(signal.SIGTERM, _shutdown)
+            loop.add_signal_handler(signal.SIGINT, _shutdown)
+        except NotImplementedError:
+            # Fallback for Windows (loop.add_signal_handler is not implemented)
+            import signal as sync_signal
+            def sync_shutdown(signum, frame):
+                logger.info(f"[{self.name}] Shutdown signal received (sync) — draining...")
+                loop.call_soon_threadsafe(self.shutdown_event.set)
+            
+            try:
+                sync_signal.signal(sync_signal.SIGTERM, sync_shutdown)
+                sync_signal.signal(sync_signal.SIGINT, sync_shutdown)
+            except ValueError:
+                pass
 
         try:
             await asyncio.gather(
