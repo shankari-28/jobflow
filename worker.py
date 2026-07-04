@@ -25,9 +25,15 @@ import os
 import random
 import signal
 import socket
+import sys
 import traceback
 import uuid
 from datetime import datetime
+
+# Force UTF-8 output on Windows to prevent UnicodeEncodeError crashing the process
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import psutil
 from sqlalchemy import select
@@ -193,7 +199,7 @@ class Worker:
             job_name = job_id  # fallback for logging
 
             try:
-                # --- Step 1: Load job and transition claimed → running ---
+                # --- Step 1: Load job and transition claimed -> running ---
                 async with AsyncSessionLocal() as db:
                     async with db.begin():
                         result = await db.execute(select(Job).where(Job.id == job_id))
