@@ -6,7 +6,9 @@
 (function () {
   'use strict';
 
-  const BASE_URL = 'http://localhost:8000/api';
+  const BASE_URL = window.location.origin.includes(':5173') || window.location.origin.includes(':3000')
+    ? 'http://localhost:8000/api'
+    : window.location.origin + '/api';
   const TOKEN_KEY = 'jf_token';
 
   /* ── Helpers ─────────────────────────────────────────────────── */
