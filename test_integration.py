@@ -32,13 +32,31 @@ async def test_lifecycle():
         user = await auth_service.create_user(db, test_email, test_user, test_password)
         print(f"User created: {user.username} ({user.email})")
 
-        # Get the seeded project
-        result = await db.execute(select(Project))
-        project = result.scalars().first()
-        if not project:
-            print("ERROR: Seeded project not found!", file=sys.stderr)
-            sys.exit(1)
-        print(f"Auto-seeded Project found: {project.name} ({project.id})")
+        # Create testing organization & project manually
+        from app.models.organization import Organization, OrgMember, MemberRole
+        org = Organization(
+            name="Test Org",
+            slug=f"test-org-{user.id[:6]}",
+            owner_id=user.id
+        )
+        db.add(org)
+        await db.flush()
+
+        member = OrgMember(
+            org_id=org.id,
+            user_id=user.id,
+            role=MemberRole.owner
+        )
+        db.add(member)
+
+        project = Project(
+            org_id=org.id,
+            name="Test Project",
+            description="Test Project description"
+        )
+        db.add(project)
+        await db.flush()
+        print(f"Test Project created: {project.name} ({project.id})")
 
         # 3. Create a queue
         print("\n[3/6] Creating test queue...")
