@@ -25,6 +25,14 @@ async def list_all_projects(db: DBSession, current_user: CurrentUser):
     return {"success": True, "data": [{"id": p.id, "name": p.name, "org_id": p.org_id} for p in projects]}
 
 
+@router.get("/api/queues", response_model=dict)
+async def list_all_queues(db: DBSession, current_user: CurrentUser):
+    """Convenience endpoint: list all queues (used by frontend dropdowns)."""
+    result = await db.execute(select(Queue))
+    queues = result.scalars().all()
+    return {"success": True, "data": [QueueOut.model_validate(q).model_dump() for q in queues]}
+
+
 @router.post("/api/projects/{project_id}/queues", response_model=dict, status_code=201)
 async def create_queue(project_id: str, body: QueueCreate, db: DBSession, current_user: CurrentUser):
     proj_result = await db.execute(select(Project).where(Project.id == project_id))
