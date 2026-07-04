@@ -26,34 +26,6 @@ async def register(body: UserRegister, db: DBSession):
             username = f"{username}_{str(uuid.uuid4())[:6]}"
 
     user = await create_user(db, body.email, username, body.password)
-
-    # Seed default organization & project for instant onboarding
-    from app.models.organization import Organization, OrgMember, MemberRole
-    from app.models.project import Project
-
-    org = Organization(
-        name="Default Org",
-        slug=f"default-org-{user.id[:6]}",
-        owner_id=user.id
-    )
-    db.add(org)
-    await db.flush()
-
-    member = OrgMember(
-        org_id=org.id,
-        user_id=user.id,
-        role=MemberRole.owner
-    )
-    db.add(member)
-
-    project = Project(
-        org_id=org.id,
-        name="Default Project",
-        description="Auto-generated default project for onboarding"
-    )
-    db.add(project)
-    await db.flush()
-
     return {"success": True, "data": {"id": user.id, "email": user.email, "username": user.username}}
 
 

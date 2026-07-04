@@ -13,6 +13,11 @@
       subtitle: 'Platform health at a glance',
       render:   () => Dashboard.renderDashboardPage(),
     },
+    projects: {
+      title:    'Projects & Orgs',
+      subtitle: 'Manage organizations and project workspaces',
+      render:   () => Projects.renderProjectsPage(),
+    },
     queues: {
       title:    'Queues',
       subtitle: 'Manage job queues and configurations',
