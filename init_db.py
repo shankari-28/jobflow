@@ -29,6 +29,19 @@ def main():
     try:
         # Use synchronous engine to create tables
         engine = create_engine(settings.SYNC_DATABASE_URL)
+        
+        # Check if workers table exists, and if so, migrate it
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "workers" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("workers")]
+            if "project_id" not in columns:
+                print("Migrating workers table: adding project_id column...")
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE workers ADD COLUMN project_id VARCHAR(36) NULL"))
+                    conn.execute(text("ALTER TABLE workers ADD CONSTRAINT fk_workers_projects FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL"))
+                print("workers table migrated successfully.")
+
         Base.metadata.create_all(bind=engine)
         print("All tables initialized successfully!")
     except Exception as e:
