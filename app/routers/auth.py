@@ -8,7 +8,24 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 @router.post("/register", response_model=dict, status_code=201)
 async def register(body: UserRegister, db: DBSession):
-    user = await create_user(db, body.email, body.username, body.password)
+    username = body.username
+    if not username:
+        import uuid
+        if body.first_name:
+            username = body.first_name
+            if body.last_name:
+                username += f"_{body.last_name}"
+        else:
+            username = body.email.split("@")[0]
+        
+        # Clean non-alphanumeric characters
+        username = "".join(c for c in username if c.isalnum() or c in ("-", "_")).strip()
+        if not username or len(username) < 3:
+            username = f"user_{str(uuid.uuid4())[:8]}"
+        else:
+            username = f"{username}_{str(uuid.uuid4())[:6]}"
+
+    user = await create_user(db, body.email, username, body.password)
     return {"success": True, "data": {"id": user.id, "email": user.email, "username": user.username}}
 
 

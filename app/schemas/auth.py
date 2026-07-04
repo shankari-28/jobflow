@@ -5,8 +5,10 @@ from typing import Optional
 
 class UserRegister(BaseModel):
     email: EmailStr
-    username: str
     password: str
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
     @field_validator("password")
     @classmethod
@@ -17,10 +19,12 @@ class UserRegister(BaseModel):
 
     @field_validator("username")
     @classmethod
-    def username_format(cls, v: str) -> str:
-        if len(v) < 3:
-            raise ValueError("Username must be at least 3 characters")
-        return v.strip()
+    def username_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if len(v) < 3:
+                raise ValueError("Username must be at least 3 characters")
+            return v.strip()
+        return v
 
 
 class UserLogin(BaseModel):
