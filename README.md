@@ -20,19 +20,28 @@ JobFlow is a production-grade, distributed background job scheduling and executi
 
 ```mermaid
 graph TD
-    ClientApp[Client Application] -->|REST API / JWT| APIServer[FastAPI Server]
-    APIServer -->|Write Jobs / Queues| DB[(MySQL Database)]
-    APIServer -->|Lifespan Cron Scheduler| APScheduler[APScheduler Engine]
-    APScheduler -->|Promote / Re-queue| DB
+    subgraph Vercel [Vercel Hosting]
+        ClientApp[SPA Frontend / Dashboard]
+    end
+
+    subgraph Railway [Railway Hosting]
+        APIServer[FastAPI Server]
+        DB[(MySQL Database)]
+        APIServer -->|Write Jobs / Queues| DB
+        APIServer -->|Background Watchdog & Cron| APScheduler[APScheduler Engine]
+        APScheduler -->|Promote / Re-queue| DB
+    end
     
-    WorkerProcess1[worker.py --id worker-1] -->|SELECT FOR UPDATE SKIP LOCKED| DB
-    WorkerProcess2[worker.py --id worker-2] -->|SELECT FOR UPDATE SKIP LOCKED| DB
-    
-    WorkerProcess1 -->|Execute Tasks| Handlers[Echo, Sleep, Fail, Custom...]
-    WorkerProcess2 -->|Execute Tasks| Handlers
-    
-    WorkerProcess1 -->|Heartbeat / Stats| DB
-    WorkerProcess2 -->|Heartbeat / Stats| DB
+    subgraph Worker Nodes [Worker Pools / Scaling]
+        Worker1[Worker A]
+        Worker2[Worker B]
+    end
+
+    ClientApp -->|HTTP/REST + JWT over HTTPS| APIServer
+    Worker1 -->|SELECT FOR UPDATE SKIP LOCKED| DB
+    Worker2 -->|SELECT FOR UPDATE SKIP LOCKED| DB
+    Worker1 -->|Heartbeat & Resource Stats| DB
+    Worker2 -->|Heartbeat & Resource Stats| DB
 ```
 
 ---
