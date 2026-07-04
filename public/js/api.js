@@ -9,7 +9,7 @@
   // For production hosting (e.g. Vercel frontend calling Railway backend).
   // If your frontend and backend are hosted on separate domains, set this to your backend URL:
   // e.g., 'https://jobflow-production.up.railway.app'
-  const PRODUCTION_BACKEND_URL = '';
+  const PRODUCTION_BACKEND_URL = 'jobflow-production-b020.up.railway.app';
 
   const BASE_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
     ? 'http://localhost:8000/api'
