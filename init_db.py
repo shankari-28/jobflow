@@ -1,6 +1,7 @@
 import sys
 import pymysql
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from app.config import settings
 from app.database import Base
 from app.models import *  # ensure all models are imported to register with Base
@@ -8,16 +9,30 @@ from app.models import *  # ensure all models are imported to register with Base
 def main():
     print("Connecting to MySQL server...")
     try:
+        if settings.DATABASE_URL_STR:
+            url = make_url(settings.DATABASE_URL_STR)
+            host = url.host
+            port = url.port or 3306
+            user = url.username
+            password = url.password
+            db_name = url.database
+        else:
+            host = settings.DATABASE_HOST
+            port = settings.DATABASE_PORT
+            user = settings.DATABASE_USER
+            password = settings.DATABASE_PASSWORD
+            db_name = settings.DATABASE_NAME
+
         # Connect without database specified to create it if it doesn't exist
         connection = pymysql.connect(
-            host=settings.DATABASE_HOST,
-            port=settings.DATABASE_PORT,
-            user=settings.DATABASE_USER,
-            password=settings.DATABASE_PASSWORD,
+            host=host,
+            port=port,
+            user=user,
+            password=password,
         )
         with connection.cursor() as cursor:
-            print(f"Creating database '{settings.DATABASE_NAME}' if not exists...")
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {settings.DATABASE_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            print(f"Creating database '{db_name}' if not exists...")
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         connection.commit()
         connection.close()
         print("Database created or already exists.")
