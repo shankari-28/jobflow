@@ -11,3 +11,5 @@ apscheduler==3.10.4
 python-multipart==0.0.9
 psutil==5.9.8
 croniter==2.0.5
+pymysql==1.1.0
+cryptography==42.0.5
