@@ -24,30 +24,26 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """Build the async MySQL URL using URL.create() to safely handle special chars in password."""
-        return str(
-            URL.create(
-                drivername="mysql+aiomysql",
-                username=self.DATABASE_USER,
-                password=self.DATABASE_PASSWORD,
-                host=self.DATABASE_HOST,
-                port=self.DATABASE_PORT,
-                database=self.DATABASE_NAME,
-            )
-        )
+        return URL.create(
+            drivername="mysql+aiomysql",
+            username=self.DATABASE_USER,
+            password=self.DATABASE_PASSWORD,
+            host=self.DATABASE_HOST,
+            port=self.DATABASE_PORT,
+            database=self.DATABASE_NAME,
+        ).render_as_string(hide_password=False)
 
     @property
     def SYNC_DATABASE_URL(self) -> str:
         """Synchronous URL used by Alembic migrations (pymysql driver)."""
-        return str(
-            URL.create(
-                drivername="mysql+pymysql",
-                username=self.DATABASE_USER,
-                password=self.DATABASE_PASSWORD,
-                host=self.DATABASE_HOST,
-                port=self.DATABASE_PORT,
-                database=self.DATABASE_NAME,
-            )
-        )
+        return URL.create(
+            drivername="mysql+pymysql",
+            username=self.DATABASE_USER,
+            password=self.DATABASE_PASSWORD,
+            host=self.DATABASE_HOST,
+            port=self.DATABASE_PORT,
+            database=self.DATABASE_NAME,
+        ).render_as_string(hide_password=False)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
