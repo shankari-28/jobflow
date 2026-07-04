@@ -76,10 +76,11 @@ async def test_lifecycle():
     # 5. Start standalone worker process in background
     print("\n[5/6] Starting worker process in background...")
     worker_id = f"worker-test-{uuid.uuid4().hex[:4]}"
+    log_file = open("worker_test.log", "w", encoding="utf-8")
     worker_proc = subprocess.Popen(
         [sys.executable, "worker.py", "--id", worker_id, "--concurrency", "2", "--poll", "0.5"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=log_file,
         text=True
     )
     print(f"Worker process started with PID={worker_proc.pid}")
