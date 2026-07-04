@@ -78,8 +78,8 @@ async def test_lifecycle():
     worker_id = f"worker-test-{uuid.uuid4().hex[:4]}"
     worker_proc = subprocess.Popen(
         [sys.executable, "worker.py", "--id", worker_id, "--concurrency", "2", "--poll", "0.5"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         text=True
     )
     print(f"Worker process started with PID={worker_proc.pid}")
