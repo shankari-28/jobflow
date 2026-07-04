@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 from sqlalchemy.engine import URL
@@ -5,14 +6,14 @@ from sqlalchemy.engine import URL
 
 class Settings(BaseSettings):
     # Database URL override for hosted environments (e.g. Railway, Render, Heroku)
-    DATABASE_URL_STR: Optional[str] = None
+    DATABASE_URL_STR: Optional[str] = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
 
     # Database
-    DATABASE_HOST: str = "localhost"
-    DATABASE_PORT: int = 3306
-    DATABASE_USER: str = "root"
-    DATABASE_PASSWORD: str = ""
-    DATABASE_NAME: str = "jobqueue"
+    DATABASE_HOST: str = os.getenv("MYSQLHOST") or "localhost"
+    DATABASE_PORT: int = int(os.getenv("MYSQLPORT")) if os.getenv("MYSQLPORT") else 3306
+    DATABASE_USER: str = os.getenv("MYSQLUSER") or "root"
+    DATABASE_PASSWORD: str = os.getenv("MYSQLPASSWORD") or ""
+    DATABASE_NAME: str = os.getenv("MYSQLDATABASE") or "jobqueue"
 
     # Auth
     SECRET_KEY: str = "changeme-in-production"
