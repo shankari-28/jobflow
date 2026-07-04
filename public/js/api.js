@@ -6,9 +6,14 @@
 (function () {
   'use strict';
 
-  const BASE_URL = window.location.origin.includes(':5173') || window.location.origin.includes(':3000')
+  // For production hosting (e.g. Vercel frontend calling Railway backend).
+  // If your frontend and backend are hosted on separate domains, set this to your backend URL:
+  // e.g., 'https://jobflow-production.up.railway.app'
+  const PRODUCTION_BACKEND_URL = '';
+
+  const BASE_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
     ? 'http://localhost:8000/api'
-    : window.location.origin + '/api';
+    : (PRODUCTION_BACKEND_URL ? PRODUCTION_BACKEND_URL + '/api' : window.location.origin + '/api');
   const TOKEN_KEY = 'jf_token';
 
   /* ── Helpers ─────────────────────────────────────────────────── */
