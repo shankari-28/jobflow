@@ -131,26 +131,27 @@ async def claim_next_job(db: AsyncSession, worker_id: str) -> Optional[Job]:
     - Each row is locked by exactly one transaction
     - SKIP LOCKED means other workers skip already-locked rows instantly
     - No deadlocks, no duplicate processing
-    """
-    async with db.begin_nested():
-        result = await db.execute(
-            select(Job)
-            .join(Queue, Job.queue_id == Queue.id)
-            .where(
-                Job.status == JobStatus.queued,
-                Queue.is_paused.is_(False),
-            )
-            .order_by(Job.priority.desc(), Job.created_at.asc())
-            .limit(1)
-            .with_for_update(skip_locked=True)
-        )
-        job = result.scalar_one_or_none()
-        if not job:
-            return None
 
-        job.status = JobStatus.claimed
-        job.worker_id = worker_id
-        await db.flush()
+    NOTE: Caller must wrap this in `async with db.begin()` to hold the lock.
+    """
+    result = await db.execute(
+        select(Job)
+        .join(Queue, Job.queue_id == Queue.id)
+        .where(
+            Job.status == JobStatus.queued,
+            Queue.is_paused.is_(False),
+        )
+        .order_by(Job.priority.desc(), Job.created_at.asc())
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        return None
+
+    job.status = JobStatus.claimed
+    job.worker_id = worker_id
+    await db.flush()
 
     return job
 

@@ -181,64 +181,79 @@ class Worker:
             await asyncio.sleep(settings.WORKER_HEARTBEAT_INTERVAL)
 
     async def execute_job(self, job_id: str):
-        """Execute a single job: run handler, write execution record, handle retry/DLQ."""
+        """Execute a single job: run handler, write execution record, handle retry/DLQ.
+
+        Uses separate top-level AsyncSessionLocal() sessions for each step to avoid
+        SQLAlchemy session/transaction scoping issues that caused jobs to get stuck in 'claimed'.
+        """
         async with self.semaphore:
             task = asyncio.current_task()
             self.active_tasks.add(task)
+            exec_id = None
+            job_name = job_id  # fallback for logging
+
             try:
+                # --- Step 1: Load job and transition claimed → running ---
                 async with AsyncSessionLocal() as db:
-                    # Load job
-                    result = await db.execute(select(Job).where(Job.id == job_id))
-                    job = result.scalar_one_or_none()
-                    if not job:
-                        logger.warning(f"Job {job_id} not found — skipping")
-                        return
-
-                    # Create execution record + transition to running
                     async with db.begin():
+                        result = await db.execute(select(Job).where(Job.id == job_id))
+                        job = result.scalar_one_or_none()
+                        if not job:
+                            logger.warning(f"Job {job_id} not found — skipping")
+                            return
+                        job_name = job.name
                         execution = await begin_execution(db, job, self.id)
+                        exec_id = execution.id
+                        attempt = execution.attempt_number
 
-                    exec_id = execution.id
-                    logger.info(f"[{self.name}] START job={job.name} id={job_id} attempt={execution.attempt_number}")
+                logger.info(f"[{self.name}] START job={job_name} id={job_id} attempt={attempt}")
 
-                    # Write start log
-                    async with AsyncSessionLocal() as log_db:
-                        async with log_db.begin():
-                            await log_job_event(log_db, job_id, exec_id, "info",
-                                                f"Job started on worker {self.name}", {"worker": self.name})
+                # --- Step 2: Write start log ---
+                async with AsyncSessionLocal() as log_db:
+                    async with log_db.begin():
+                        await log_job_event(log_db, job_id, exec_id, "info",
+                                            f"Job started on worker {self.name}", {"worker": self.name})
 
-                    # Run the actual handler
-                    error_msg = None
-                    error_tb = None
-                    success = False
-                    try:
-                        result_data = await dispatch_job(job.payload or {})
-                        success = True
-                        logger.info(f"[{self.name}] DONE  job={job.name} id={job_id}")
-                    except Exception as exc:
-                        error_msg = str(exc)
-                        error_tb = traceback.format_exc()
-                        logger.warning(f"[{self.name}] FAIL  job={job.name} id={job_id}: {error_msg}")
+                # --- Step 3: Run the actual handler (no DB session held) ---
+                error_msg = None
+                error_tb = None
+                success = False
+                try:
+                    # Fetch payload fresh outside any session
+                    async with AsyncSessionLocal() as pdb:
+                        pr = await pdb.execute(select(Job).where(Job.id == job_id))
+                        pj = pr.scalar_one()
+                        payload = pj.payload or {}
 
-                    # Write result to DB
-                    async with AsyncSessionLocal() as finish_db:
-                        async with finish_db.begin():
-                            j_result = await finish_db.execute(select(Job).where(Job.id == job_id))
-                            j = j_result.scalar_one()
-                            from app.models.job_execution import JobExecution
-                            e_result = await finish_db.execute(
-                                select(JobExecution).where(JobExecution.id == exec_id)
-                            )
-                            e = e_result.scalar_one()
+                    await dispatch_job(payload)
+                    success = True
+                    logger.info(f"[{self.name}] DONE  job={job_name} id={job_id}")
+                except Exception as exc:
+                    error_msg = str(exc)
+                    error_tb = traceback.format_exc()
+                    logger.warning(f"[{self.name}] FAIL  job={job_name} id={job_id}: {error_msg}")
 
-                            if success:
-                                await complete_execution(finish_db, j, e)
-                                await log_job_event(finish_db, job_id, exec_id, "info", "Job completed successfully")
-                                self.jobs_completed += 1
-                            else:
-                                await fail_execution(finish_db, j, e, error_msg, error_tb)
-                                await log_job_event(finish_db, job_id, exec_id, "error",
-                                                    f"Job failed: {error_msg}", {"traceback": error_tb})
+                # --- Step 4: Write outcome (complete or fail/retry/DLQ) ---
+                from app.models.job_execution import JobExecution
+                async with AsyncSessionLocal() as finish_db:
+                    async with finish_db.begin():
+                        j_result = await finish_db.execute(select(Job).where(Job.id == job_id))
+                        j = j_result.scalar_one()
+                        e_result = await finish_db.execute(
+                            select(JobExecution).where(JobExecution.id == exec_id)
+                        )
+                        e = e_result.scalar_one()
+
+                        if success:
+                            await complete_execution(finish_db, j, e)
+                            await log_job_event(finish_db, job_id, exec_id, "info",
+                                                "Job completed successfully")
+                            self.jobs_completed += 1
+                        else:
+                            await fail_execution(finish_db, j, e, error_msg, error_tb)
+                            await log_job_event(finish_db, job_id, exec_id, "error",
+                                                f"Job failed: {error_msg}",
+                                                {"traceback": error_tb})
 
             except Exception as e:
                 logger.exception(f"Unexpected error in execute_job({job_id}): {e}")
