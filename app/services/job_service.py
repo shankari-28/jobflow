@@ -122,7 +122,7 @@ async def enqueue_batch(db: AsyncSession, queue_id: str, jobs_data: list) -> Lis
 # Atomic Claiming — the distributed core
 # ---------------------------------------------------------------------------
 
-async def claim_next_job(db: AsyncSession, worker_id: str) -> Optional[Job]:
+async def claim_next_job(db: AsyncSession, worker_id: str, project_id: Optional[str] = None) -> Optional[Job]:
     """
     Atomically claim one queued job across ALL non-paused queues.
 
@@ -134,17 +134,19 @@ async def claim_next_job(db: AsyncSession, worker_id: str) -> Optional[Job]:
 
     NOTE: Caller must wrap this in `async with db.begin()` to hold the lock.
     """
-    result = await db.execute(
+    stmt = (
         select(Job)
         .join(Queue, Job.queue_id == Queue.id)
         .where(
             Job.status == JobStatus.queued,
             Queue.is_paused.is_(False),
         )
-        .order_by(Job.priority.desc(), Job.created_at.asc())
-        .limit(1)
-        .with_for_update(skip_locked=True)
     )
+    if project_id:
+        stmt = stmt.where(Queue.project_id == project_id)
+
+    stmt = stmt.order_by(Job.priority.desc(), Job.created_at.asc()).limit(1).with_for_update(skip_locked=True)
+    result = await db.execute(stmt)
     job = result.scalar_one_or_none()
     if not job:
         return None

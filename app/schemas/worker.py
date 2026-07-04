@@ -1,6 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
+
+
+class WorkerCreate(BaseModel):
+    project_id: str
+    name: Optional[str] = None
+    concurrency: int = Field(default=5, ge=1, le=50)
+    poll_interval: float = Field(default=1.0, ge=0.1, le=10.0)
 
 
 class WorkerOut(BaseModel):

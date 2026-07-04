@@ -116,11 +116,12 @@ async def dispatch_job(payload: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 class Worker:
-    def __init__(self, worker_id: str, name: str, concurrency: int, poll_interval: float):
+    def __init__(self, worker_id: str, name: str, concurrency: int, poll_interval: float, project_id: Optional[str] = None):
         self.id = worker_id
         self.name = name
         self.concurrency = concurrency
         self.poll_interval = poll_interval
+        self.project_id = project_id
         self.hostname = socket.gethostname()
         self.pid = os.getpid()
         self.shutdown_event = asyncio.Event()
@@ -139,6 +140,7 @@ class Worker:
                     worker_row.last_heartbeat_at = datetime.utcnow()
                     worker_row.hostname = self.hostname
                     worker_row.pid = self.pid
+                    worker_row.project_id = self.project_id
                 else:
                     worker_row = WorkerModel(
                         id=self.id,
@@ -147,9 +149,10 @@ class Worker:
                         pid=self.pid,
                         status=WorkerStatus.idle,
                         concurrency=self.concurrency,
+                        project_id=self.project_id,
                     )
                     db.add(worker_row)
-        logger.info(f"Worker '{self.name}' ({self.id}) registered | host={self.hostname} pid={self.pid}")
+        logger.info(f"Worker '{self.name}' ({self.id}) registered | host={self.hostname} pid={self.pid} project={self.project_id}")
 
     async def deregister(self):
         """Mark this worker offline on shutdown."""
@@ -170,6 +173,12 @@ class Worker:
                         result = await db.execute(select(WorkerModel).where(WorkerModel.id == self.id))
                         worker_row = result.scalar_one_or_none()
                         if worker_row:
+                            # DB-driven stopping mechanism: if status is changed to offline or draining, exit
+                            if worker_row.status in (WorkerStatus.offline, WorkerStatus.draining):
+                                logger.info(f"[{self.name}] Status changed to {worker_row.status.value} in DB. Stopping...")
+                                self.shutdown_event.set()
+                                break
+
                             jobs_running = len(self.active_tasks)
                             worker_row.last_heartbeat_at = datetime.utcnow()
                             worker_row.status = WorkerStatus.busy if jobs_running > 0 else WorkerStatus.idle
@@ -278,7 +287,7 @@ class Worker:
 
                 async with AsyncSessionLocal() as db:
                     async with db.begin():
-                        job = await claim_next_job(db, self.id)
+                        job = await claim_next_job(db, self.id, self.project_id)
 
                 if job:
                     task = asyncio.create_task(self.execute_job(job.id))
@@ -343,6 +352,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", default=None, help="Worker display name (default: worker-<id[:6]>)")
     parser.add_argument("--concurrency", type=int, default=5, help="Max concurrent jobs (default: 5)")
     parser.add_argument("--poll", type=float, default=settings.WORKER_POLL_INTERVAL, help="Poll interval in seconds")
+    parser.add_argument("--project", default=None, help="Project ID to scope this worker to (optional)")
     args = parser.parse_args()
 
     worker_name = args.name or f"worker-{args.id[:8]}"
@@ -351,6 +361,7 @@ if __name__ == "__main__":
         name=worker_name,
         concurrency=args.concurrency,
         poll_interval=args.poll,
+        project_id=args.project,
     )
 
     asyncio.run(worker.run())

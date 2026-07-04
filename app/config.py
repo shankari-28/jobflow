@@ -3,6 +3,9 @@ from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
+    # Database URL override for hosted environments (e.g. Railway, Render, Heroku)
+    DATABASE_URL_STR: Optional[str] = None
+
     # Database
     DATABASE_HOST: str = "localhost"
     DATABASE_PORT: int = 3306
@@ -23,7 +26,14 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        """Build the async MySQL URL using URL.create() to safely handle special chars in password."""
+        """Build the async MySQL URL using URL.create() or direct connection string."""
+        if self.DATABASE_URL_STR:
+            url = self.DATABASE_URL_STR
+            if url.startswith("mysql://"):
+                return url.replace("mysql://", "mysql+aiomysql://", 1)
+            if url.startswith("mysql+pymysql://"):
+                return url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
+            return url
         return URL.create(
             drivername="mysql+aiomysql",
             username=self.DATABASE_USER,
@@ -36,6 +46,13 @@ class Settings(BaseSettings):
     @property
     def SYNC_DATABASE_URL(self) -> str:
         """Synchronous URL used by Alembic migrations (pymysql driver)."""
+        if self.DATABASE_URL_STR:
+            url = self.DATABASE_URL_STR
+            if url.startswith("mysql://"):
+                return url.replace("mysql://", "mysql+pymysql://", 1)
+            if url.startswith("mysql+aiomysql://"):
+                return url.replace("mysql+aiomysql://", "mysql+pymysql://", 1)
+            return url
         return URL.create(
             drivername="mysql+pymysql",
             username=self.DATABASE_USER,

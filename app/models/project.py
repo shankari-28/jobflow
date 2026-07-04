@@ -26,3 +26,6 @@ class Project(Base):
     retry_policies: Mapped[List["RetryPolicy"]] = relationship(
         "RetryPolicy", back_populates="project", cascade="all, delete-orphan"
     )
+    workers: Mapped[List["WorkerModel"]] = relationship(
+        "WorkerModel", back_populates="project", cascade="all, delete-orphan"
+    )

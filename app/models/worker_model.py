@@ -19,6 +19,9 @@ class WorkerModel(Base):
     __tablename__ = "workers"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    project_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
     pid: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -32,6 +35,7 @@ class WorkerModel(Base):
     )
 
     # Relationships
+    project: Mapped[Optional["Project"]] = relationship("Project", back_populates="workers")
     heartbeats: Mapped[List["WorkerHeartbeat"]] = relationship(
         "WorkerHeartbeat", back_populates="worker", cascade="all, delete-orphan"
     )
